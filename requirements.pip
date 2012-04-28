@@ -1,0 +1,9 @@
+coverage
+mock
+msgpack-python
+nose
+nosy
+pymongo
+python-dateutil
+pyzmq
+sphinx
