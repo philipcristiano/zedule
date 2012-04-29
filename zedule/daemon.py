@@ -40,6 +40,26 @@ def req_repl():
         print id_, sched_id
         socket.send_multipart(['200', str(id_)])
 
+def publisher():
+    socket = context.socket(zmq.PUB)
+    socket.bind('tcp://*:5002')
+    mongo = pymongo.Connection('33.33.33.10')
+    db = mongo.zedule
+    collection = db.items
+    import datetime
+    while True:
+        now = datetime.datetime.utcnow()
+        now_id = pymongo.objectid.ObjectId.from_datetime(now)
+        query = {'time': {'$lte': now_id}}
+        print 'looking for', now_id
+        item = collection.find_one(query)
+        print 'found', item
+        if not item:
+            time.sleep(5)
+            continue
+
+        socket.send_multipart([str(item['key']), bson.BSON.encode(item)])
+        collection.remove({'_id': item['_id']})
 
 
 def load_monitors():
@@ -55,6 +75,8 @@ def main():
 
     reply = threading.Thread(target=req_repl)
     reply.start()
+    pub = threading.Thread(target=publisher)
+    pub.start()
     reply.join()
 
 if __name__ == '__main__':
