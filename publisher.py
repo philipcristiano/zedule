@@ -8,12 +8,15 @@ socket = context.socket(zmq.REQ)
 
 socket.connect ("tcp://localhost:5001")
 
-import msgpack
+import bson
 import time
 import datetime
 
 while True:
-    headers = msgpack.packb({'time':str(datetime.datetime.utcnow())})
+    headers = bson.BSON.encode({
+        'time': datetime.datetime.utcnow(),
+        'key': 'testing',
+    })
     data = 'BLAH'
     data = socket.send_multipart((headers, data))
     print '.',

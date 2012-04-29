@@ -3,8 +3,9 @@ import time
 import threading
 
 import dateutil.parser
-import msgpack
 import pymongo
+import bson
+import pymongo.objectid
 import zmq
 
 
@@ -21,16 +22,22 @@ def req_repl():
 
     while True:
         headers, data = socket.recv_multipart()
-        headers = msgpack.unpackb(headers)
+        headers = bson.BSON(headers)
+        print type(headers)
+        headers = headers.to_dict()
         print headers
-        scheduled_for = dateutil.parser.parse(headers['time'])
+
+        #scheduled_for = dateutil.parser.parse(headers['time'])
+        sched_id = pymongo.objectid.ObjectId.from_datetime(headers['time'])
         doc = {
-            'time': scheduled_for,
+            'time': sched_id,
             'data': data,
+            'key': headers['key'],
         }
 
-        id_ = collection.insert(doc)
-        print id_
+        print doc
+        id_ = collection.insert(doc, safe=True)
+        print id_, sched_id
         socket.send_multipart(['200', str(id_)])
 
 
