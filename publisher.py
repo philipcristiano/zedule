@@ -1,6 +1,12 @@
+import datetime
+import random
 import socket as python_socket
 import sys
+import time
+
+import bson
 import zmq
+
 
 #  Socket to talk to server
 context = zmq.Context()
@@ -8,17 +14,19 @@ socket = context.socket(zmq.REQ)
 
 socket.connect ("tcp://localhost:5001")
 
-import bson
-import time
-import datetime
-
+count = 0
 while True:
+    now = datetime.datetime.utcnow()
+    offset = datetime.timedelta(seconds=random.random() * 20)
+    schedule_for = now + offset
     headers = bson.BSON.encode({
-        'time': datetime.datetime.utcnow(),
+        'time': schedule_for,
         'key': 'testing',
     })
-    data = 'BLAH'
-    data = socket.send_multipart((headers, data))
+    data = str(count)
+    method = 'insert'
+    data = socket.send_multipart((method, headers, data))
     print '.',
     print socket.recv_multipart()
-    time.sleep(5)
+    count +=1
+    time.sleep(1)
