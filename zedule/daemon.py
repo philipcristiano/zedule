@@ -1,10 +1,9 @@
+import datetime
 import time
-
 import threading
 
-import dateutil.parser
-import pymongo
 import bson
+import pymongo
 import pymongo.objectid
 import zmq
 
@@ -12,64 +11,56 @@ import zmq
 monitor_threads = {}
 context = zmq.Context()
 
+def get_items_collection():
+    mongo = pymongo.Connection('33.33.33.10')
+    return mongo.zedule.items
+
 def req_repl():
-    print 'starting req-reply'
+    "Handle incoming ZMQ requests"
     socket = context.socket(zmq.REP)
     socket.bind('tcp://*:5001')
-    mongo = pymongo.Connection('33.33.33.10')
-    db = mongo.zedule
-    collection = db.items
+    collection = get_items_collection()
 
     while True:
-        headers, data = socket.recv_multipart()
-        headers = bson.BSON(headers)
-        print type(headers)
-        headers = headers.to_dict()
-        print headers
+        receive(socket, collection)
 
-        #scheduled_for = dateutil.parser.parse(headers['time'])
-        sched_id = pymongo.objectid.ObjectId.from_datetime(headers['time'])
-        doc = {
-            'time': sched_id,
-            'data': data,
-            'key': headers['key'],
-        }
+def receive(socket, collection):
+    "Receive a single event from the socket"
+    method, headers, data = socket.recv_multipart()
+    headers = bson.BSON(headers)
+    headers = headers.decode()
 
-        print doc
-        id_ = collection.insert(doc, safe=True)
-        print id_, sched_id
-        socket.send_multipart(['200', str(id_)])
+    sched_id = pymongo.objectid.ObjectId.from_datetime(headers['time'])
+    doc = {
+        'time': sched_id,
+        'data': data,
+        'key': headers['key'],
+    }
+
+    id_ = collection.insert(doc, safe=True)
+    socket.send_multipart(['200', str(id_)])
 
 def publisher():
+    "Publish overdue items from the DB"
     socket = context.socket(zmq.PUB)
     socket.bind('tcp://*:5002')
-    mongo = pymongo.Connection('33.33.33.10')
-    db = mongo.zedule
-    collection = db.items
+    collection = get_items_collection()
     import datetime
     while True:
-        now = datetime.datetime.utcnow()
-        now_id = pymongo.objectid.ObjectId.from_datetime(now)
-        query = {'time': {'$lte': now_id}}
-        print 'looking for', now_id
-        item = collection.find_one(query)
-        print 'found', item
-        if not item:
-            time.sleep(5)
-            continue
+        publish_one(socket, collection)
 
-        socket.send_multipart([str(item['key']), bson.BSON.encode(item)])
-        collection.remove({'_id': item['_id']})
+def publish_one(socket, collection):
+    "Pull 1 item out of the DB and publish it"
+    now = datetime.datetime.utcnow()
+    now_id = pymongo.objectid.ObjectId.from_datetime(now)
+    query = {'time': {'$lte': now_id}}
+    item = collection.find_one(query)
+    if not item:
+        time.sleep(1)
+        return
 
-
-def load_monitors():
-    "Load monitors from config"
-    monitors = []
-    for monitor_item in config['monitors']:
-        monitor_name = 'monitor.monitors.{0}'.format(monitor_item)
-        print monitor_name
-        monitors.append(importlib.import_module(monitor_name))
-    return monitors
+    socket.send_multipart([str(item['key']), bson.BSON.encode(item)])
+    collection.remove({'_id': item['_id']})
 
 def main():
 
@@ -78,6 +69,7 @@ def main():
     pub = threading.Thread(target=publisher)
     pub.start()
     reply.join()
+    #pub.join()
 
 if __name__ == '__main__':
     main()
