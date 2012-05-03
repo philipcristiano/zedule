@@ -63,7 +63,6 @@ def publish_one(socket, collection):
     collection.remove({'_id': item['_id']})
 
 def main():
-
     reply = threading.Thread(target=req_repl)
     reply.start()
     pub = threading.Thread(target=publisher)

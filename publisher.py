@@ -26,7 +26,6 @@ while True:
     data = str(count)
     method = 'insert'
     data = socket.send_multipart((method, headers, data))
-    print '.',
-    print socket.recv_multipart()
+    print '.', socket.recv_multipart()
     count +=1
     time.sleep(1)
