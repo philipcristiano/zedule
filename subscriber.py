@@ -1,8 +1,8 @@
 import socket as python_socket
 import sys
-import zmq
 
 import bson
+import zmq
 
 #  Socket to talk to server
 context = zmq.Context()
